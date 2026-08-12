@@ -1,121 +1,125 @@
 # GugaGit
 
-GugaGit é um gerenciador visual de Git desenvolvido em Python com CustomTkinter, criado para simplificar tarefas do dia a dia em repositórios Git por meio de uma interface desktop moderna e objetiva.
+> Um cliente Git desktop moderno, ultrarrápido e elegante, construído com **Python + pywebview** e uma interface web nativa em **HTML5, CSS3 e JavaScript (100% Offline)**.
 
-Este projeto foi pensado tanto como ferramenta de produtividade quanto como peça de portfólio, mostrando domínio de interface gráfica, integração com Git CLI, organização modular e persistência local de configurações.
 
-## Como usar
+## 🚀 Sobre o Projeto
 
-### Versão executável
+O **GugaGit** é uma evolução completa do projeto original. A interface antiga desenvolvida em *CustomTkinter* foi totalmente descartada e substituída por uma arquitetura moderna baseada em **pywebview**. Essa mudança permitiu controle absoluto sobre o design, tipografia e UX da aplicação utilizando tecnologias web modernas, sem abrir mão da integração nativa com o sistema operacional e do controle direto via Python.
 
-A forma mais prática de usar o GugaGit é pela versão em `.exe`. Assim, qualquer pessoa pode abrir a aplicação sem precisar instalar Python ou configurar ambiente virtual.
+Desenvolvido para oferecer uma alternativa visual leve, objetiva e produtiva aos clientes Git tradicionais, o GugaGit Pro combina uma interface estilo *Bento Grid* e *Dark Mode* com o poder e a estabilidade do **Git CLI** rodando em background.
 
-Essa é a opção ideal para apresentação, testes rápidos e distribuição como portfólio.
 
-### Versão com Python
 
-Se você quiser estudar o código, ajustar a aplicação ou rodar direto do projeto, também é possível executar via Python.
+## ✨ O que mudou? (Principais Evoluções)
 
-Esse modo é indicado para desenvolvimento, manutenção e contribuições.
+- 🎨 **Migração Completa para pywebview (HTML5/CSS3/JS):** A antiga GUI em CustomTkinter deu lugar a um motor Webview ultraleve e totalmente customizável, funcionando **100% offline**.
+- 🖌️ **Redesign Visual Absoluto (Bento Grid UI):** Design escuro inspirado em dashboards modernos, tipografia refinada (*JetBrains Mono*), animações suaves e barra de título *frameless* customizada.
+- 💻 **Terminal Livre Interativo (`$ git ...`):** Prompt de comando integrado que permite digitar e executar **qualquer comando Git livremente**, registrando o histórico de saídas no console do app em tempo real.
+- ⚙️ **Painel de Configurações Completo:**
+  - Gerenciamento de dados de autoria Git (`user.name` e `user.email`).
+  - Definição de diretório padrão e preferências de clonagem.
+  - Ajustes de comportamento e preferências da interface.
+- ⚡ **Foco em UX e Produtividade:**
+  - Status em tempo real da branch ativa e repositório aberto na barra superior.
+  - Ações rápidas com 1 clique: `Sync (Fetch/Pull/Push)`, `Staging`, `Commit`, `Branch Management`, `Stash`, `Diff` e `Tags`.
+  - Salvamento automático do último workspace utilizado.
 
-## Visão geral
 
-A aplicação oferece uma interface visual para executar operações comuns de Git sem depender do terminal a todo momento. O foco é reduzir atrito em tarefas como abrir repositórios, clonar projetos, alternar branches, criar commits e acompanhar o histórico.
+## 🛠️ Tecnologias Utilizadas
 
-## Funcionalidades
+- **Back-end & Integração Nativa:**
+  - [Python 3.x](https://www.python.org/)
+  - **`pywebview`** (Ponte bidirecional e assíncrona entre Python e JavaScript)
+  - **`pythonnet`** (Integração com APIs nativas do Windows para manipulção de ícones e janelas)
+  - **`subprocess` & `shlex`** (Execução segura de comandos do Git CLI em background)
+- **Front-end UI (Offline):**
+  - **HTML5 & CSS3** (Layout estilo Bento Box, variáveis CSS e design responsivo)
+  - **JavaScript puro (ES6+)** (Integração em tempo real com a API bridge do Python)
+- **Compilação & Empacotamento:**
+  - **PyInstaller** (Geração do executável standalone `.exe` para Windows)
 
-- Abrir repositórios Git existentes
-- Clonar repositórios pela interface
-- Exibir a branch atual e o caminho do repositório
-- Atualizar status e informações do projeto
-- Criar, trocar e deletar branches
-- Adicionar arquivos, criar commits e fazer push
-- Executar pull e fetch
-- Restaurar alterações e remover staging
-- Gerenciar stash com guardar, listar e aplicar
-- Visualizar status, branches, histórico, diff, stashes e tags
-- Exibir janelas modais para entradas e seleções
-- Salvar o último repositório usado localmente
-- Aplicar ícone personalizado nas janelas do app
 
-## Tecnologias utilizadas
 
-- Python
-- CustomTkinter
-- Tkinter
-- Git CLI
-
-## Requisitos
-
-Para usar a aplicação, a máquina precisa ter:
-
-- Git instalado e disponível no PATH
-- No caso da versão em Python, Python instalado também
-
-## Estrutura do projeto
+## 📁 Estrutura do Projeto
 
 ```text
 GugaGit/
-├─ main.py
-├─ README.md
-├─ assets/
-│  └─ gugabit.ico
-└─ src/
-   ├─ config.py
-   ├─ dialogs.py
-   ├─ git_manager.py
-   └─ gui.py
+├── assets/
+│   ├── index.html
+│   └── gugabit.ico
+├── src/
+│   ├── config.py
+│   └── git_manager.py
+├── main.py
+├── requirements.txt
+└── README.md
 ```
 
-## Execução via Python
+## 🔧 Requisitos de Sistema
 
-Para rodar o projeto em modo fonte:
+- **Git CLI** instalado e disponível no `PATH` do sistema.
+- **Python 3.10+** (apenas para execução a partir do código fonte).
+- **Windows 10/11** (com suporte otimizado para ícone na barra de tarefas e janela *frameless*).
 
-```bash
-pip install -r requirements.txt
-python main.py
-```
+## 📥 Como Executar
 
-Se preferir, você também pode instalar apenas a dependência principal com `pip install customtkinter`.
+### Opção 1: Via Código Fonte (Desenvolvimento)
 
-## Execução da versão executável
+1. Clone o repositório:
+   ```bash
+   git clone https://github.com/GustavoFelipeM/GugaGit.git
+   cd GugaGit
+   ```
 
-Se você estiver usando a versão compilada, basta abrir o arquivo `.exe` gerado na distribuição do projeto.
+2. Crie e ative um ambiente virtual:
+   ```bash
+   python -m venv .venv
+   
+   # Windows (PowerShell/CMD):
+   .venv\Scripts\activate
+   
+   # Linux/macOS:
+   source .venv/bin/activate
+   ```
 
-## Como o projeto funciona
+3. Instale as dependências:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-- `main.py` inicia a aplicação.
-- `src/gui.py` concentra a interface principal, menus, modais e ações de usuário.
-- `src/git_manager.py` encapsula os comandos Git executados pela aplicação.
-- `src/config.py` cuida de configurações locais, como o último repositório acessado e o ícone da janela.
-- `src/dialogs.py` contém diálogos reutilizáveis de confirmação.
+4. Execute o projeto:
+   ```bash
+   python main.py
+   ```
 
-## Destaques para portfólio
+### Opção 2: Baixar Executável Pronto (`.exe`)
 
-O GugaGit mostra prática em:
+Se você quer apenas utilizar o programa sem precisar instalar o Python e configurar dependências:
 
-- desenvolvimento de interface desktop com Python
-- integração com ferramentas de linha de comando
-- organização em módulos separados por responsabilidade
-- persistência de dados locais do usuário
-- foco em experiência de uso e produtividade
-- distribuição em formato executável para usuários finais
+1. Acesse a seção de **[Releases do GitHub](https://github.com/GustavoFelipeM/GugaGit/releases)**.
+2. Baixe o arquivo executável da versão mais recente (ex: `GugaGit.exe`).
+3. Dê um duplo clique para rodar a aplicação diretamente no Windows.
 
-## Observações
 
-- A aplicação depende do Git instalado para funcionar corretamente.
-- O projeto salva o último repositório aberto no diretório de dados local do usuário.
-- O ícone personalizado é aplicado às janelas principais e secundárias.
-- A versão executável é a melhor opção para demonstração em portfólio.
+## 🎯 Destaques de Arquitetura para Portfólio
 
-## Possíveis melhorias
+- **Arquitetura Híbrida Leve (Python + Webview):** Elimina o consumo massivo de memória do Electron/Node.js, utilizando o motor de renderização nativo do SO junto com a simplicidade e performance do Python.
+- **Comunicação Assíncrona Bi-direcional:** Chamadas entre a camada visual (JS) e o gerenciador Git (Python) acontecem sem congelar a interface.
+- **Execução Segura de Comandos no Terminal:** O terminal integrado trata entradas com `shlex.split` e define *timeouts* rigorosos no `subprocess` para evitar que comandos interativos (que exijam editores de texto) travem o programa.
+- **Persistência de Estado Local:** Mantém automaticamente o contexto de trabalho e as preferências em diretórios padrão do sistema (`%LOCALAPPDATA%` ou `~/.config/GugaGit`).
 
-- Adicionar empacotamento automatizado do `.exe`
-- Incluir screenshots da interface
-- Criar alternância entre tema claro e escuro
-- Melhorar feedback visual para operações longas de Git
-- Disponibilizar release com instalador
+## 📸 Demonstração da Interface
 
-## Licença
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/8a946def-7ddb-43d2-a81e-361a699929db" alt="Interface do GugaGit Pro" width="100%" />
+</div>
+<br>
 
-Projeto pessoal para estudo, prática e portfólio.
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/971bb8ad-3087-4c8a-9388-75ef786ec31b" alt="Painel de Configurações" width="100%" />
+</div>
+
+## 📝 Licença
+
+Projeto desenvolvido para fins de estudo, prática de arquitetura desktop e composição de portfólio.

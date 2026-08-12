@@ -1,28 +1,29 @@
 import json
 import os
-
+import sys
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ICONE = os.path.join(BASE_DIR, "assets", "gugabit.ico")
 
 
-PASTA_CONFIG = os.path.join(
-    os.environ["LOCALAPPDATA"],
-    "GugaGit"
-)
+if sys.platform == "win32":
+    PASTA_BASE_APP = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
+else:
+    PASTA_BASE_APP = os.path.expanduser("~/.config")
 
-ARQUIVO_CONFIG = os.path.join(
-    PASTA_CONFIG,
-    "config.json"
-)
+PASTA_CONFIG = os.path.join(PASTA_BASE_APP, "GugaGit")
+ARQUIVO_CONFIG = os.path.join(PASTA_CONFIG, "config.json")
 
 
 def carregar_config():
     if not os.path.exists(ARQUIVO_CONFIG):
         return {}
 
-    with open(ARQUIVO_CONFIG, "r", encoding="utf-8") as arquivo:
-        return json.load(arquivo)
+    try:
+        with open(ARQUIVO_CONFIG, "r", encoding="utf-8") as arquivo:
+            return json.load(arquivo)
+    except Exception:
+        return {}
 
 
 def salvar_config(config):
@@ -39,18 +40,10 @@ def salvar_config(config):
 
 def salvar_ultimo_repositorio(pasta):
     config = carregar_config()
-
     config["ultimo_repositorio"] = pasta
-
     salvar_config(config)
 
 
 def obter_ultimo_repositorio():
     config = carregar_config()
-
     return config.get("ultimo_repositorio")
-
-
-def aplicar_icone(janela):
-    if os.path.exists(ICONE):
-        janela.iconbitmap(ICONE)
