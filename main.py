@@ -21,10 +21,10 @@ class GugaGitAPI:
     # ==========================================
 
     def obter_config_git(self):
-        obter_config_git()
+        return obter_config_git()
 
     def salvar_config_git(self, nome, email):
-        salvar_config_git(nome, email)
+        return salvar_config_git(nome, email)
     
     def verificar_git(self):
         return git_instalado()
