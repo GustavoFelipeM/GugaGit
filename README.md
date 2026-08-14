@@ -110,7 +110,7 @@ GugaGit/
 
 ---
 
-#### Linux (Debian)
+#### Linux
 
 1. Clone o repositório:
 
@@ -144,7 +144,7 @@ GugaGit/
    PYWEBVIEW_GUI=qt python3 main.py
    ```
 
-> O procedimento acima foi testado no Debian. A compatibilidade com outras distribuições Linux ainda não foi validada.
+> Compatibilidade validada em Debian 13.6, Ubuntu 26.04 e Fedora 44-1.7.
 
 ### Opção 2: Baixar Executável Pronto (`.exe`)
 
