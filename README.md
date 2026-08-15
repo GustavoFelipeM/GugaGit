@@ -45,14 +45,36 @@ Desenvolvido para oferecer uma alternativa visual leve, objetiva e produtiva aos
 ```text
 GugaGit/
 ├── assets/
-│   ├── index.html
-│   └── gugabit.ico
+│   ├── css/
+│   │   └── style.css
+│   ├── js/
+│   │   └── script.js
+│   ├── gugabit.ico
+│   └── index.html
 ├── src/
-│   ├── config.py
-│   └── git_manager.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   └── git_service.py
+│   ├── infrastructure/
+│   │   ├── __init__.py
+│   │   ├── git_cli.py
+│   │   └── storage.py
+│   ├── ui/
+│   │   ├── __init__.py
+│   │   └── api.py
+│   └── __init__.py
+├── tests/
+│   ├── integration/
+│   │   ├── test_git_integration.py
+│   │   └── test_storage_integration.py
+│   └── unit/
+│       ├── test_git_cli.py
+│       ├── test_git_service.py
+│       └── test_storage.py
+├── .gitignore
 ├── main.py
-├── requirements.txt
-└── README.md
+├── README.md
+└── requirements.txtss
 ```
 
 ## 🔧 Requisitos de Sistema
