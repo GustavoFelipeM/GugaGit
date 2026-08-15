@@ -1,4 +1,19 @@
+# Pastas temporárias e cache do Python (ESSAS SIM DEVEM SER IGNORADAS)
 __pycache__/
 *.pyc
-config.json
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Ambientes virtuais
+venv/
 .venv/
+env/
+
+# Configurações de IDEs
+.vscode/
+
+# Pastas de build executável (PyInstaller / PyWebView)
+build/
+dist/
+*.spec
