@@ -1,9 +1,5 @@
 import subprocess
-import shutil
-import shlex
-
-def git_instalado():
-    return shutil.which("git") is not None
+from src.infrastructure.git_cli import interface_git, tratar_erros, git_instalado, executar_comando_livre
 
 def obter_config_git():
     nome = interface_git(["git", "config", "--global", "user.name"])
@@ -21,20 +17,6 @@ def salvar_config_git(nome, email):
     if r1.returncode == 0 and r2.returncode == 0:
         return "Configurações de autoria atualizadas com sucesso!", True
     return "Erro ao salvar configurações.", False
-
-def interface_git(comando):
-    resultado = subprocess.run(
-        comando,
-        capture_output=True,
-        text=True
-    )
-    return resultado
-
-def tratar_erros(resultado, mensagem):
-    if resultado.returncode == 0:
-        return mensagem, True
-    else:
-        return resultado.stderr, False
 
 def branch_atual():
     resultado = interface_git(["git", "branch", "--show-current"])
@@ -166,30 +148,3 @@ def listar_tags():
         return resultado.stdout
     
     return None
-
-def executar_comando_livre(comando_texto, pasta_repositorio=None):
-    comando_texto = comando_texto.strip()
-    if not comando_texto:
-        return "Comando vazio.", False
-
-    try:
-        args = shlex.split(comando_texto)
-        
-        resultado = subprocess.run(
-            args,
-            cwd=pasta_repositorio,
-            capture_output=True,
-            text=True,
-            timeout=15
-        )
-        
-        saida = resultado.stdout if resultado.stdout else resultado.stderr
-        if not saida:
-            saida = "Comando executado com sucesso (sem retorno de texto)."
-            
-        return saida, (resultado.returncode == 0)
-        
-    except subprocess.TimeoutExpired:
-        return "ERRO: O comando demorou muito ou exige interação (ex: editor de texto).", False
-    except Exception as e:
-        return f"ERRO ao executar comando: {str(e)}", False

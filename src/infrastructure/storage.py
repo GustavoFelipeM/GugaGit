@@ -2,10 +2,6 @@ import json
 import os
 import sys
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ICONE = os.path.join(BASE_DIR, "assets", "gugabit.ico")
-
-
 if sys.platform == "win32":
     PASTA_BASE_APP = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
 else:
@@ -13,7 +9,6 @@ else:
 
 PASTA_CONFIG = os.path.join(PASTA_BASE_APP, "GugaGit")
 ARQUIVO_CONFIG = os.path.join(PASTA_CONFIG, "config.json")
-
 
 def carregar_config():
     if not os.path.exists(ARQUIVO_CONFIG):
@@ -24,7 +19,6 @@ def carregar_config():
             return json.load(arquivo)
     except Exception:
         return {}
-
 
 def salvar_config(config):
     os.makedirs(PASTA_CONFIG, exist_ok=True)
@@ -37,12 +31,10 @@ def salvar_config(config):
             ensure_ascii=False
         )
 
-
 def salvar_ultimo_repositorio(pasta):
     config = carregar_config()
     config["ultimo_repositorio"] = pasta
     salvar_config(config)
-
 
 def obter_ultimo_repositorio():
     config = carregar_config()

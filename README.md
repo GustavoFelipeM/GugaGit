@@ -69,7 +69,7 @@ GugaGit/
 * **Python 3.10+**.
 * Um ambiente gráfico compatível com o backend Qt do `pywebview`.
 
-> **Testado no Debian.** A execução em outras distribuições Linux não foi validada.
+> **Testado no Debian, Ubuntu e Fedora.** A execução em outras distribuições Linux não foi validada.
 
 ## 📥 Como Executar
 
@@ -154,12 +154,44 @@ Se você quer apenas utilizar o programa sem precisar instalar o Python e config
 2. Baixe o arquivo executável da versão mais recente (ex: `GugaGit.exe`).
 3. Dê um duplo clique para rodar a aplicação diretamente no Windows.
 
+## 🧪 Executando os Testes
+O projeto possui uma suíte automatizada completa dividida em **testes unitários** (executados com mocks isolados para rápida validação) e **testes de integração** (que operam comandos reais sobre repositórios Git temporários em disco).
+
+### Instalar dependências de teste
+Certifique-se de que o ambiente virtual está ativo e instale o `pytest`:
+
+```bash
+pip install pytest
+```
+
+### Comandos de Execução
+* **Executar toda a suíte de testes (Unitários + Integração):**
+
+```bash
+pytest -v
+```
+
+* **Executar apenas os testes unitários (Mocks rápidos):**
+
+```bash
+pytest tests/test_git_service.py tests/test_git_cli.py tests/test_storage.py -v
+```
+
+* **Executar apenas os testes de integração reais (Em repositórios Git temporários):**
+
+```bash
+pytest tests/test_git_integration.py tests/test_storage_integration.py -v
+```
+
+> 🛡️ Garantia de Isolamento: Os testes de integração utilizam as fixtures `tmp_path` e `monkeypatch` do Pytest. Nenhum repositório pessoal ou arquivo de configuração global (`.gitconfig`) é modificado durante a execução dos testes.
+
 ## 🎯 Destaques de Arquitetura para Portfólio
 
 * **Arquitetura Híbrida Leve (Python + Webview):** Elimina o consumo massivo de memória do Electron/Node.js, utilizando o motor de renderização nativo do SO junto com a simplicidade e performance do Python.
 * **Comunicação Assíncrona Bi-direcional:** Chamadas entre a camada visual (JS) e o gerenciador Git (Python) acontecem sem congelar a interface.
 * **Execução Segura de Comandos no Terminal:** O terminal integrado trata entradas com `shlex.split` e define *timeouts* rigorosos no `subprocess` para evitar que comandos interativos (que exijam editores de texto) travem o programa.
 * **Persistência de Estado Local:** Mantém automaticamente o contexto de trabalho e as preferências em diretórios padrão do sistema (`%LOCALAPPDATA%` ou `~/.config/GugaGit`).
+* **Suíte de Testes Automatizados:** Cobertura de edge cases do Git (operações fora do repo, branches inexistentes, timeout, conflitos e stashes sem alterações).
 
 ## 📸 Demonstração da Interface
 
