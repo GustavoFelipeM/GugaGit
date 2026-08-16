@@ -1,12 +1,14 @@
 import os
+import json
 import webview
 
 from src.core.git_service import (
-    branch_atual, executar_comando_livre, obter_config_git, salvar_config_git, status, fetch, 
+    adicionar_arquivos_staging, branch_atual, executar_comando_livre, obter_config_git, salvar_config_git, status, fetch, 
     criar_branch, adicionar, commit, push, listar_branches, trocar_branch, pull, clonar_repositorio, 
     restaurar_alteracoes, deletar_branch, remover_staging, historico, diff, stash, stash_pop, 
-    listar_stash, merge, listar_tags, git_instalado
+    listar_stash, merge, listar_tags, git_instalado, obter_arquivos_status, remover_selecionados_staging
 )
+from src.core.types import GitResult
 from src.infrastructure.storage import obter_ultimo_repositorio, salvar_ultimo_repositorio
 
 class GugaGitAPI:
@@ -20,10 +22,16 @@ class GugaGitAPI:
     # ==========================================
 
     def obter_config_git(self):
-        obter_config_git()
-
+        res = obter_config_git()
+        if hasattr(res, "to_dict"):
+            return res.to_dict()
+        return res
+    
     def salvar_config_git(self, nome, email):
-        salvar_config_git(nome, email)
+        res = salvar_config_git(nome, email)
+        if hasattr(res, "to_dict"):
+            return res.to_dict()
+        return res
     
     def verificar_git(self):
         return git_instalado()
@@ -81,10 +89,16 @@ class GugaGitAPI:
             pass
 
     def log(self, mensagem):
-        if webview.windows:
-            # Escapa quebras de linha e aspas para não quebrar o JS
-            msg_limpa = str(mensagem).replace('`', "'").replace('\\', '\\\\')
-            webview.windows[0].evaluate_js(f"if(typeof logTerminal === 'function') logTerminal(`{msg_limpa}`)")
+        if webview.windows and len(webview.windows) > 0:
+            msg_json = json.dumps(str(mensagem))
+            webview.windows[0].evaluate_js(f"if(typeof logTerminal === 'function') logTerminal({msg_json})")
+
+    def _processar_resultado(self, res: GitResult) -> bool:
+        """Centraliza a escrita nos logs da UI e exibe erros detalhados quando houver."""
+        self.log(f"> {res.mensagem}")
+        if not res.sucesso and res.erro_detalhado:
+            self.log(f"[DEBUG GIT]: {res.erro_detalhado}")
+        return res.sucesso
 
     def _registrar_workspace(self, pasta):
         os.chdir(pasta)
@@ -92,20 +106,26 @@ class GugaGitAPI:
         self.repo_atual = os.path.basename(pasta)
         salvar_ultimo_repositorio(pasta)
 
+        res_branch = branch_atual()
+        nome_branch = res_branch.dados if res_branch.sucesso else "---"
+
         return {
             "sucesso": True,
             "repo": self.repo_atual,
-            "branch": branch_atual(),
+            "branch": nome_branch,
             "caminho": pasta,
         }
 
     def obter_estado_atual(self):
         if self.pasta_atual and os.path.isdir(self.pasta_atual):
             repo = self.repo_atual or os.path.basename(self.pasta_atual)
+            res_branch = branch_atual()
+            nome_branch = res_branch.dados if res_branch.sucesso else "---"
+
             return {
                 "sucesso": True,
                 "repo": repo,
-                "branch": branch_atual(),
+                "branch": nome_branch,
                 "caminho": self.pasta_atual,
             }
 
@@ -150,8 +170,8 @@ class GugaGitAPI:
 
     def executar_clonar(self, url, pasta_destino):
         self.log(f"> Clonando {url} para {pasta_destino}...")
-        mensagem, sucesso = clonar_repositorio(url, pasta_destino)
-        self.log(f"> {mensagem}")
+        res = clonar_repositorio(url, pasta_destino)
+        sucesso = self._processar_resultado(res)
 
         if sucesso:
             nome_repo = url.rstrip("/").split("/")[-1]
@@ -169,56 +189,62 @@ class GugaGitAPI:
     # ==========================================
     def executar_fetch(self):
         self.log("> Executando fetch...")
-        mensagem, sucesso = fetch()
-        self.log(f"> {mensagem}")
-        return sucesso
+        res = fetch()
+        return self._processar_resultado(res)
 
     def executar_pull(self):
         self.log("> Executando pull...")
-        mensagem, sucesso = pull()
-        self.log(f"> {mensagem}")
-        return sucesso
+        res = pull()
+        return self._processar_resultado(res)
 
     def executar_push(self):
-        branch = branch_atual()
+        res_branch = branch_atual()
+        if not res_branch.sucesso or not res_branch.dados:
+            self.log("> ERRO: Não foi possível identificar a branch atual para o push.")
+            return False
+
+        branch = res_branch.dados
         self.log(f"> Executando push na branch {branch}...")
-        mensagem, sucesso = push(branch)
-        self.log(f"> {mensagem}")
-        return sucesso
+        res = push(branch)
+        return self._processar_resultado(res)
 
     # ==========================================
     # BRANCHES & MERGE
     # ==========================================
     def obter_branches(self):
-        branches = listar_branches()
-        return branches or []
+        res = listar_branches()
+        return res.dados if res.sucesso and res.dados else []
 
     def executar_listar_branches(self):
         return self.obter_branches()
 
     def executar_criar_branch(self, nome):
         self.log(f"> Criando branch '{nome}'...")
-        mensagem, sucesso = criar_branch(nome.strip())
-        self.log(f"> {mensagem}")
-        return {"sucesso": sucesso, "branch": branch_atual()}
+        res = criar_branch(nome.strip())
+        sucesso = self._processar_resultado(res)
+        
+        res_b = branch_atual()
+        nome_branch = res_b.dados if res_b.sucesso else "---"
+        return {"sucesso": sucesso, "branch": nome_branch}
 
     def executar_trocar_branch(self, nome):
         self.log(f"> Trocando para a branch '{nome}'...")
-        mensagem, sucesso = trocar_branch(nome)
-        self.log(f"> {mensagem}")
-        return {"sucesso": sucesso, "branch": branch_atual()}
+        res = trocar_branch(nome)
+        sucesso = self._processar_resultado(res)
+        
+        res_b = branch_atual()
+        nome_branch = res_b.dados if res_b.sucesso else "---"
+        return {"sucesso": sucesso, "branch": nome_branch}
 
     def executar_deletar_branch(self, nome):
         self.log(f"> Deletando branch '{nome}'...")
-        mensagem, sucesso = deletar_branch(nome)
-        self.log(f"> {mensagem}")
-        return sucesso
+        res = deletar_branch(nome)
+        return self._processar_resultado(res)
 
     def executar_merge(self, nome_branch):
         self.log(f"> Fazendo merge de '{nome_branch}' na branch atual...")
-        mensagem, sucesso = merge(nome_branch)
-        self.log(f"> {mensagem}")
-        return sucesso
+        res = merge(nome_branch)
+        return self._processar_resultado(res)
 
     # ==========================================
     # STAGING E COMMIT
@@ -228,20 +254,17 @@ class GugaGitAPI:
             self.log("> ERRO: Mensagem de commit vazia.")
             return False
             
-        add_msg, add_sucesso = adicionar()
-        self.log(f"> {add_msg}")
-        
-        if add_sucesso:
-            com_msg, com_sucesso = commit(mensagem)
-            self.log(f"> {com_msg}")
-            return com_sucesso
+        res_add = adicionar()
+        if self._processar_resultado(res_add):
+            self.log("> Criando commit...")
+            res_com = commit(mensagem)
+            return self._processar_resultado(res_com)
         return False
 
     def executar_adicionar(self):
         self.log("> Adicionando arquivos ao staging...")
-        mensagem, sucesso = adicionar()
-        self.log(f"> {mensagem}")
-        return sucesso
+        res = adicionar()
+        return self._processar_resultado(res)
 
     def executar_commit(self, mensagem):
         if not mensagem.strip():
@@ -249,72 +272,91 @@ class GugaGitAPI:
             return False
 
         self.log("> Criando commit...")
-        mensagem_commit, sucesso = commit(mensagem.strip())  
-        self.log(f"> {mensagem_commit}")
-        return sucesso
+        res = commit(mensagem.strip())
+        return self._processar_resultado(res)
 
     def executar_remover_staging(self):
         self.log("> Removendo arquivos do staging...")
-        mensagem, sucesso = remover_staging()  
-        self.log(f"> {mensagem}")
-        return sucesso
+        res = remover_staging()
+        return self._processar_resultado(res)
 
     def executar_restaurar(self):
         self.log("> Restaurando alterações de arquivos modificados...")
-        mensagem, sucesso = restaurar_alteracoes()  
-        self.log(f"> {mensagem}")
-        return sucesso
+        res = restaurar_alteracoes()
+        return self._processar_resultado(res)
+
+    def obter_arquivos_status(self):
+        res = obter_arquivos_status()
+        if isinstance(res, list):
+            return res
+        if hasattr(res, "sucesso") and res.sucesso and isinstance(res.dados, list):
+            return res.dados
+        return []
+
+
+    def executar_adicionar_selecionados(self, arquivos):
+        self.log(f"> Adicionando {len(arquivos)} arquivo(s) ao staging...")
+        res = adicionar_arquivos_staging(arquivos)
+        return self._processar_resultado(res)
+
+    def executar_remover_selecionados_staging(self, arquivos):
+        self.log(f"> Removendo {len(arquivos)} arquivo(s) do staging...")
+        res = remover_selecionados_staging(arquivos)
+        return self._processar_resultado(res)
 
     # ==========================================
     # CONSULTAS (Status, Log, Diff, Tags)
     # ==========================================
     def executar_status(self):
-        resultado = status()  
-        self.log(f"> STATUS:\n{resultado}")
-        return resultado
+        res = status()
+        conteudo = res.dados if res.sucesso else res.mensagem
+        self.log(f"> STATUS:\n{conteudo}")
+        return conteudo
 
     def executar_branches(self):
-        resultado = listar_branches()  
-        self.log(f"> BRANCHES:\n{resultado}")
-        return resultado
+        res = listar_branches()
+        conteudo = "\n".join(res.dados) if (res.sucesso and isinstance(res.dados, list)) else res.mensagem
+        self.log(f"> BRANCHES:\n{conteudo}")
+        return conteudo
 
     def executar_historico(self):
-        resultado = historico()  
-        self.log(f"> HISTÓRICO (LOG):\n{resultado}")
-        return resultado
+        res = historico()
+        conteudo = res.dados if res.sucesso else res.mensagem
+        self.log(f"> HISTÓRICO (LOG):\n{conteudo}")
+        return conteudo
 
     def executar_diff(self):
-        resultado = diff()  
-        if not resultado or not str(resultado).strip():
-            resultado = "Nenhuma diferença encontrada."
+        res = diff()
+        conteudo = res.dados if res.sucesso else res.mensagem
+        if not conteudo or not str(conteudo).strip():
+            conteudo = "Nenhuma diferença encontrada."
 
-        self.log(f"> DIFF:\n{resultado}")
-        return resultado
+        self.log(f"> DIFF:\n{conteudo}")
+        return conteudo
 
     def obter_tags(self):
-        resultado = listar_tags()  
-        self.log(f"> TAGS:\n{resultado}")
-        return resultado
+        res = listar_tags()
+        conteudo = res.dados if res.sucesso else res.mensagem
+        self.log(f"> TAGS:\n{conteudo}")
+        return conteudo
 
     # ==========================================
     # STASH
     # ==========================================
     def executar_stash(self):
         self.log("> Guardando alterações em Stash...")
-        mensagem, sucesso = stash()  
-        self.log(f"> {mensagem}")
-        return sucesso
+        res = stash()
+        return self._processar_resultado(res)
 
     def executar_stash_pop(self):
         self.log("> Aplicando Stash (Pop)...")
-        mensagem, sucesso = stash_pop()  
-        self.log(f"> {mensagem}")
-        return sucesso
+        res = stash_pop()
+        return self._processar_resultado(res)
 
     def obter_stashes(self):
-        resultado = listar_stash()  
-        return resultado or ""
+        res = listar_stash()
+        return res.dados if res.sucesso else ""
 
     def executar_tags(self):
-        resultado = listar_tags()  
-        return resultado or ""
+        res = listar_tags()
+        return res.dados if res.sucesso else ""

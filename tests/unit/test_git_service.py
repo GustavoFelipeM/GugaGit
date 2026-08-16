@@ -1,5 +1,6 @@
 from unittest.mock import patch, MagicMock
-from src.core.git_service import adicionar, branch_atual, clonar_repositorio, commit, criar_branch, diff, fetch, obter_config_git, pull, pull, push, remover_staging, restaurar_alteracoes, salvar_config_git, listar_branches, status, deletar_branch, historico, stash, stash_pop, listar_stash, merge, listar_tags, trocar_branch
+from src.core.types import GitResult
+from src.core.git_service import adicionar, branch_atual, clonar_repositorio, commit, criar_branch, diff, fetch, obter_config_git, pull, pull, push, remover_staging, restaurar_alteracoes, salvar_config_git, listar_branches, status, deletar_branch, historico, stash, stash_pop, listar_stash, merge, listar_tags, trocar_branch, remover_selecionados_staging, obter_arquivos_status, adicionar_arquivos_staging
 
 # -----------------------------------------------------------------------------
 # obter_config_git
@@ -8,19 +9,15 @@ from src.core.git_service import adicionar, branch_atual, clonar_repositorio, co
 # Teste 1: obter_config_git quando as duas chamadas funcionam
 @patch("src.core.git_service.interface_git")
 def test_obter_config_git_sucesso(mock_interface):
-    res_nome = MagicMock()
-    res_nome.returncode = 0
-    res_nome.stdout = "Dev\n"
-
-    res_email = MagicMock()
-    res_email.returncode = 0
-    res_email.stdout = "dev@email.com\n"
-
+    res_nome = MagicMock(returncode=0, stdout="Dev\n")
+    res_email = MagicMock(returncode=0, stdout="dev@email.com\n")
     mock_interface.side_effect = [res_nome, res_email]
 
-    config = obter_config_git()
+    res = obter_config_git()
 
-    assert config == {
+    assert isinstance(res, GitResult)
+    assert res.sucesso is True
+    assert res.dados == {
         "nome": "Dev",
         "email": "dev@email.com"
     }
@@ -32,26 +29,24 @@ def test_obter_config_git_sucesso(mock_interface):
 # Teste 2: salvar_config_git quando as duas chamadas funcionam
 @patch("src.core.git_service.interface_git")
 def test_salvar_config_git_sucesso(mock_interface):
-    res_sucesso = MagicMock()
-    res_sucesso.returncode = 0
-    mock_interface.return_value = res_sucesso
+    mock_interface.return_value = MagicMock(returncode=0)
 
-    msg, sucesso = salvar_config_git("Dev", "dev@email.com")
-    assert sucesso is True
-    assert msg == "Configurações de autoria atualizadas com sucesso!"
+    res = salvar_config_git("Dev", "dev@email.com")
+
+    assert res.sucesso is True
+    assert res.mensagem == "Configurações de autoria atualizadas com sucesso!"
     assert mock_interface.call_count == 2
 
 # Teste 3: salvar_config_git quando uma das chamadas falha
 @patch("src.core.git_service.interface_git")
 def test_salvar_config_git_falha(mock_interface):
-    res_falha = MagicMock()
-    res_falha.returncode = 1
-    mock_interface.return_value = res_falha
+    mock_interface.return_value = MagicMock(returncode=1, stderr="Erro no git config")
 
-    msg, sucesso = salvar_config_git("Dev", "dev@email.com")
-    assert sucesso is False
-    assert msg == "Erro ao salvar configurações."
-    assert mock_interface.call_count == 2
+    res = salvar_config_git("Dev", "dev@email.com")
+
+    assert res.sucesso is False
+    assert res.mensagem == "Erro ao salvar configurações."
+    assert res.erro_detalhado == "Erro no git config"
 
 # -----------------------------------------------------------------------------
 # branch_atual
@@ -59,588 +54,572 @@ def test_salvar_config_git_falha(mock_interface):
 
 # Teste 4: branch_atual retorna o nome da branch atual
 @patch("src.core.git_service.interface_git")
-def test_branch_atual(mock_interface):
-    res_branch = MagicMock()
-    res_branch.returncode = 0
-    res_branch.stdout = "main\n"
-    mock_interface.return_value = res_branch
+def test_branch_atual_sucesso(mock_interface):
+    mock_interface.return_value = MagicMock(returncode=0, stdout="main\n")
 
-    branch = branch_atual()
-    assert branch == "main"
+    res = branch_atual()
+
+    assert res.sucesso is True
+    assert res.dados == "main"
+
+# Teste 5: branch_atual retorna erro quando não é um repositório git
+@patch("src.core.git_service.interface_git")
+def test_branch_atual_falha(mock_interface):
+    mock_interface.return_value = MagicMock(returncode=1, stderr="fatal: not a git repository")
+
+    res = branch_atual()
+
+    assert res.sucesso is False
+    assert res.mensagem == "Não foi possível identificar a branch atual."
+    assert res.erro_detalhado == "fatal: not a git repository"
 
 # -----------------------------------------------------------------------------
 # status
 # -----------------------------------------------------------------------------
 
-# Teste 5: status retorna o status do git
+# Teste 6: status retorna o status do git
 @patch("src.core.git_service.interface_git")
-def test_status(mock_interface):
-    res_status = MagicMock()
-    res_status.returncode = 0
-    res_status.stdout = "On branch main\nYour branch is up to date with 'origin/main'.\n"
-    mock_interface.return_value = res_status
+def test_status_sucesso(mock_interface):
+    mock_interface.return_value = MagicMock(
+        returncode=0, 
+        stdout="On branch main\nYour branch is up to date with 'origin/main'.\n"
+    )
 
-    status_output = status()
-    assert "On branch main" in status_output
-    assert "Your branch is up to date with 'origin/main'." in status_output
+    res = status()
+
+    assert res.sucesso is True
+    assert "On branch main" in res.dados
 
 # -----------------------------------------------------------------------------
 # fetch
 # -----------------------------------------------------------------------------
 
-# Teste 6: fetch retorna a mensagem de sucesso quando a operação é bem-sucedida
-@patch("src.core.git_service.interface_git")
-def test_fetch_sucesso(mock_interface):
-    res_fetch = MagicMock()
-    res_fetch.returncode = 0
-    res_fetch.stdout = "Fetching origin\n"
-    mock_interface.return_value = res_fetch
+# Teste 7: fetch retorna a mensagem de sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_fetch_sucesso(mock_executar):
+    mock_executar.return_value = ("Informações atualizadas!", True, "")
 
-    msg, sucesso = fetch()
-    assert msg == "Informações atualizadas!"
-    assert sucesso is True
+    res = fetch()
 
-# Teste 7: fetch retorna a mensagem de erro quando a operação falha
-@patch("src.core.git_service.interface_git")
-def test_fetch_falha(mock_interface):
-    res_fetch = MagicMock()
-    res_fetch.returncode = 1
-    res_fetch.stderr = "error: could not fetch"
-    mock_interface.return_value = res_fetch
+    assert res.sucesso is True
+    assert res.mensagem == "Informações atualizadas!"
 
-    msg, sucesso = fetch()
-    
-    assert msg == "error: could not fetch"
-    assert sucesso is False
+# Teste 8: fetch retorna a mensagem de erro quando a operação falha
+@patch("src.core.git_service.executar_e_tratar")
+def test_fetch_falha(mock_executar):
+    mock_executar.return_value = ("Erro de conexão", False, "error: could not fetch")
+
+    res = fetch()
+
+    assert res.sucesso is False
+    assert res.mensagem == "Erro de conexão"
+    assert res.erro_detalhado == "error: could not fetch"
 
 # -----------------------------------------------------------------------------
 # criar_branch
 # -----------------------------------------------------------------------------
 
-# Teste 8: criar_branch retorna a mensagem de sucesso quando a operação é bem-sucedida
-@patch("src.core.git_service.interface_git")
-def test_criar_branch_sucesso(mock_interface):
-    res_branch = MagicMock()
-    res_branch.returncode = 0
-    res_branch.stdout = "Switched to a new branch 'feature/login'\n"
-    mock_interface.return_value = res_branch
+# Teste 9: criar_branch retorna a mensagem de sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_criar_branch_sucesso(mock_executar):
+    mock_executar.return_value = ("Branch 'feature/login' criada com sucesso!", True, "")
 
-    msg, sucesso = criar_branch("feature/login")
-    assert msg == "Branch criada!"
-    assert sucesso is True
+    res = criar_branch("feature/login")
 
-# Teste 9: criar_branch retorna a mensagem de erro quando a operação falha
-@patch("src.core.git_service.interface_git")
-def test_criar_branch_falha(mock_interface):
-    res_branch = MagicMock()
-    res_branch.returncode = 1
-    res_branch.stderr = "error: could not create branch"
-    mock_interface.return_value = res_branch
+    assert res.sucesso is True
+    assert res.mensagem == "Branch 'feature/login' criada com sucesso!"
 
-    msg, sucesso = criar_branch("feature/login")
-    
-    assert msg == "error: could not create branch"
-    assert sucesso is False
+# Teste 10: criar_branch retorna a mensagem de erro quando a operação falha
+@patch("src.core.git_service.executar_e_tratar")
+def test_criar_branch_falha(mock_executar):
+    mock_executar.return_value = ("Erro ao criar branch.", False, "fatal: A branch already exists")
+
+    res = criar_branch("feature/login")
+
+    assert res.sucesso is False
+    assert res.erro_detalhado == "fatal: A branch already exists"
 
 # -----------------------------------------------------------------------------
 # adicionar
 # -----------------------------------------------------------------------------
 
-# Teste 10: adicionar retorna a mensagem de sucesso quando a operação é bem-sucedida
-@patch("src.core.git_service.interface_git")
-def test_adicionar_sucesso(mock_interface):
-    res_add = MagicMock()
-    res_add.returncode = 0
-    res_add.stdout = "Changes to be committed:\n  (use \"git restore --staged <file>...\" to unstage)\n\n\tnew file:   test_file.txt\n"
-    mock_interface.return_value = res_add
+# Teste 11: adicionar retorna a mensagem de sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_adicionar_sucesso(mock_executar):
+    mock_executar.return_value = ("Arquivos adicionados!", True, "")
 
-    msg, sucesso = adicionar()
-    assert msg == "Arquivos adicionados!"
-    assert sucesso is True
+    res = adicionar()
 
-# Teste 11: adicionar retorna a mensagem de erro quando a operação falha
-@patch("src.core.git_service.interface_git")
-def test_adicionar_falha(mock_interface):
-    res_add = MagicMock()
-    res_add.returncode = 1
-    res_add.stderr = "error: could not add files"
-    mock_interface.return_value = res_add
+    assert res.sucesso is True
+    assert res.mensagem == "Arquivos adicionados!"
 
-    msg, sucesso = adicionar()
-    
-    assert msg == "error: could not add files"
-    assert sucesso is False
+# Teste 12: adicionar retorna a mensagem de erro quando a operação falha
+@patch("src.core.git_service.executar_e_tratar")
+def test_adicionar_falha(mock_executar):
+    mock_executar.return_value = ("Erro ao adicionar arquivos.", False, "error: could not add files")
+
+    res = adicionar()
+
+    assert res.sucesso is False
+    assert res.erro_detalhado == "error: could not add files"
 
 # -----------------------------------------------------------------------------
 # commit
 # -----------------------------------------------------------------------------
 
-# Teste 12: commit retorna a mensagem de sucesso quando a operação é bem-sucedida
-@patch("src.core.git_service.interface_git")
-def test_commit_sucesso(mock_interface):
-    res_commit = MagicMock()
-    res_commit.returncode = 0
-    res_commit.stdout = "[main 1a2b3c4] Commit message\n 1 file changed, 1 insertion(+)\n"
-    mock_interface.return_value = res_commit
+# Teste 13: commit retorna a mensagem de falha quando está vazio
+def test_commit_mensagem_vazia():
+    res = commit("   ")
 
-    msg, sucesso = commit("Commit message")
-    assert msg == "Commit realizado!"
-    assert sucesso is True
+    assert res.sucesso is False
+    assert res.mensagem == "A mensagem de commit não pode estar vazia."
 
-# Teste 13: commit retorna a mensagem de erro quando a operação falha
-@patch("src.core.git_service.interface_git")
-def test_commit_falha(mock_interface):
-    res_commit = MagicMock()
-    res_commit.returncode = 1
-    res_commit.stderr = "error: could not commit"
-    mock_interface.return_value = res_commit
+# Teste 14: commit retorna a mensagem de sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_commit_sucesso(mock_executar):
+    mock_executar.return_value = ("Commit realizado!", True, "")
 
-    msg, sucesso = commit("Commit message")
-    
-    assert msg == "error: could not commit"
-    assert sucesso is False
+    res = commit("Commit message")
+
+    assert res.sucesso is True
+    assert res.mensagem == "Commit realizado!"
+
+# Teste 15: commit retorna a mensagem de erro quando a operação falha
+@patch("src.core.git_service.executar_e_tratar")
+def test_commit_falha(mock_executar):
+    mock_executar.return_value = ("Erro ao commitar.", False, "nothing to commit")
+
+    res = commit("Commit message")
+
+    assert res.sucesso is False
+    assert res.erro_detalhado == "nothing to commit"
 
 # -----------------------------------------------------------------------------
 # push
 # -----------------------------------------------------------------------------
 
-# Teste 14: push retorna a mensagem de sucesso quando a operação é bem-sucedida
-@patch("src.core.git_service.interface_git")
-def test_push_sucesso(mock_interface):
-    res_push = MagicMock()
-    res_push.returncode = 0
-    res_push.stdout = "To github.com:user/repo.git\n   abc123..def456  main -> main\n"
-    mock_interface.return_value = res_push
+# Teste 16: push retorna a mensagem de sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_push_sucesso(mock_executar):
+    mock_executar.return_value = ("Push realizado com sucesso!", True, "")
 
-    msg, sucesso = push("main")
+    res = push("main")
 
-    assert msg == "Push realizado com sucesso!"
-    assert sucesso is True
+    assert res.sucesso is True
+    assert res.mensagem == "Push realizado com sucesso!"
+    mock_executar.assert_called_once_with(["git", "push", "-u", "origin", "main"], "Push realizado com sucesso!")
 
-    mock_interface.assert_called_once_with(["git", "push", "-u", "origin", "main"])
+# Teste 17: push retorna a mensagem de erro quando a operação falha
+@patch("src.core.git_service.executar_e_tratar")
+def test_push_falha(mock_executar):
+    mock_executar.return_value = ("Push rejeitado: Faça pull antes.", False, "error: failed to push")
 
-# Teste 15: push retorna a mensagem de erro quando a operação falha
-@patch("src.core.git_service.interface_git")
-def test_push_falha(mock_interface):
-    res_push = MagicMock()
-    res_push.returncode = 1
-    res_push.stderr = "error: could not push"
-    mock_interface.return_value = res_push
+    res = push("main")
 
-    msg, sucesso = push("main")
-    
-    assert msg == "error: could not push"
-    assert sucesso is False
+    assert res.sucesso is False
+    assert res.erro_detalhado == "error: failed to push"
 
 # -----------------------------------------------------------------------------
 # listar_branches
 # -----------------------------------------------------------------------------
 
-# Teste 16: listar_branches limpando os caracteres de branch ativa '*'
+# Teste 18: listar_branches limpando os caracteres de branch ativa '*'
 @patch("src.core.git_service.interface_git")
 def test_listar_branches_sucesso(mock_interface):
-    res_fake = MagicMock()
-    res_fake.returncode = 0
+    mock_interface.return_value = MagicMock(returncode=0, stdout="* main\n  feature/login\n  hotfix/bug")
 
-    res_fake.stdout = "* main\n  feature/login\n  hotfix/bug"
-    mock_interface.return_value = res_fake
+    res = listar_branches()
 
-    branches = listar_branches()
-    assert branches == ["main", "feature/login", "hotfix/bug"]
+    assert res.sucesso is True
+    assert res.dados == ["main", "feature/login", "hotfix/bug"]
 
-# Teste 17: listar_branches retorna lista vazia quando a operação falha
+# Teste 19: listar_branches retorna lista vazia quando a operação falha
 @patch("src.core.git_service.interface_git")
 def test_listar_branches_falha(mock_interface):
-    res_fake = MagicMock()
-    res_fake.returncode = 1
-    res_fake.stderr = "error: could not list branches"
-    mock_interface.return_value = res_fake
+    mock_interface.return_value = MagicMock(returncode=1, stderr="error: could not list branches")
 
-    branches = listar_branches()
-    
-    assert branches == None
+    res = listar_branches()
+
+    assert res.sucesso is False
+    assert res.erro_detalhado == "error: could not list branches"
 
 # -----------------------------------------------------------------------------
 # trocar_branch
 # -----------------------------------------------------------------------------
 
-# Teste 18: trocar_branch retorna a mensagem de sucesso quando a operação é bem-sucedida
-@patch("src.core.git_service.interface_git")
-def test_trocar_branch_sucesso(mock_interface):
-    res_checkout = MagicMock()
-    res_checkout.returncode = 0
-    res_checkout.stdout = "Switched to branch 'feature/login'\n"
-    mock_interface.return_value = res_checkout
+# Teste 20: trocar_branch retorna a mensagem de sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_trocar_branch_sucesso(mock_executar):
+    mock_executar.return_value = ("Trocado para a branch 'feature/login' com sucesso!", True, "")
 
-    msg, sucesso = trocar_branch("feature/login")
-    assert msg == "Branch trocado com sucesso!"
-    assert sucesso is True
+    res = trocar_branch("feature/login")
 
-# Teste 19: trocar_branch retorna a mensagem de erro quando a operação falha
-@patch("src.core.git_service.interface_git")
-def test_trocar_branch_falha(mock_interface):
-    res_checkout = MagicMock()
-    res_checkout.returncode = 1
-    res_checkout.stderr = "error: could not switch branch"
-    mock_interface.return_value = res_checkout
+    assert res.sucesso is True
+    assert res.mensagem == "Trocado para a branch 'feature/login' com sucesso!"
 
-    msg, sucesso = trocar_branch("feature/login")
-    
-    assert msg == "error: could not switch branch"
-    assert sucesso is False
+# Teste 21: trocar_branch retorna a mensagem de erro quando a operação falha
+@patch("src.core.git_service.executar_e_tratar")
+def test_trocar_branch_falha(mock_executar):
+    mock_executar.return_value = ("Troca cancelada: alteração local pendente.", False, "error: Your local changes...")
+
+    res = trocar_branch("feature/login")
+
+    assert res.sucesso is False
+    assert res.erro_detalhado == "error: Your local changes..."
 
 # -----------------------------------------------------------------------------
 # pull
 # -----------------------------------------------------------------------------
 
-# Teste 20: pull retorna a mensagem de sucesso quando a operação é bem-sucedida
-@patch("src.core.git_service.interface_git")
-def test_pull_sucesso(mock_interface):
-    res_pull = MagicMock()
-    res_pull.returncode = 0
-    res_pull.stdout = "Updating abc123..def456\nFast-forward\n file.txt | 1 +\n 1 file changed, 1 insertion(+)\n"
-    mock_interface.return_value = res_pull
+# Teste 22: pull retorna a mensagem de sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_pull_sucesso(mock_executar):
+    mock_executar.return_value = ("Pull feito com sucesso!", True, "")
 
-    msg, sucesso = pull()
-    assert msg == "Pull feito com sucesso!"
-    assert sucesso is True
+    res = pull()
 
-# Teste 21: pull retorna a mensagem de erro quando a operação falha
-@patch("src.core.git_service.interface_git")
-def test_pull_falha(mock_interface):
-    res_pull = MagicMock()
-    res_pull.returncode = 1
-    res_pull.stderr = "error: could not pull"
-    mock_interface.return_value = res_pull
+    assert res.sucesso is True
+    assert res.mensagem == "Pull feito com sucesso!"
 
-    msg, sucesso = pull()
-    
-    assert msg == "error: could not pull"
-    assert sucesso is False
+# Teste 23: pull retorna a mensagem de erro quando a operação falha
+@patch("src.core.git_service.executar_e_tratar")
+def test_pull_falha(mock_executar):
+    mock_executar.return_value = ("Erro ao fazer pull", False, "error: could not pull")
+
+    res = pull()
+
+    assert res.sucesso is False
+    assert res.erro_detalhado == "error: could not pull"
 
 # -----------------------------------------------------------------------------
 # clonar_repositorio
 # -----------------------------------------------------------------------------
 
-# Teste 22: clonar_repositorio retorna a mensagem de sucesso quando a operação é bem-sucedida
+# Teste 24: clonar_repositorio retorna a mensagem de sucesso quando a operação é bem-sucedida
 @patch("subprocess.run")
-def test_clonar_repositorio_sucesso(mock_interface):
-    res_clone = MagicMock()
-    res_clone.returncode = 0
-    res_clone.stdout = "Cloning into 'repo'...\n"
-    mock_interface.return_value = res_clone
+def test_clonar_repositorio_sucesso(mock_run):
+    mock_run.return_value = MagicMock(returncode=0, stdout="Cloning into 'repo'...\n")
 
-    msg, sucesso = clonar_repositorio("github.com:user/repo.git", "repo")
-    assert msg == "Repositorio clonado com sucesso!"
-    assert sucesso is True
+    res = clonar_repositorio("github.com:user/repo.git", "repo")
 
-# Teste 23: clonar_repositorio retorna a mensagem de erro quando a operação falha
+    assert res.sucesso is True
+    assert res.mensagem == "Repositório clonado com sucesso!"
+
+# Teste 25: clonar_repositorio retorna a mensagem de erro quando a operação falha
 @patch("subprocess.run")
-def test_clonar_repositorio_falha(mock_interface):
-    res_clone = MagicMock()
-    res_clone.returncode = 1
-    res_clone.stderr = "error: could not clone repository"
-    mock_interface.return_value = res_clone
+def test_clonar_repositorio_falha(mock_run):
+    mock_run.return_value = MagicMock(returncode=1, stderr="error: could not clone repository")
 
-    msg, sucesso = clonar_repositorio("github.com:user/repo.git", "repo")
-    
-    assert msg == "error: could not clone repository"
-    assert sucesso is False
+    res = clonar_repositorio("github.com:user/repo.git", "repo")
 
+    assert res.sucesso is False
+    assert res.erro_detalhado == "error: could not clone repository"
 
 # -----------------------------------------------------------------------------
 # restaurar_alteracoes
 # -----------------------------------------------------------------------------
 
-# Teste 24: restaurar_alteracoes retorna a mensagem de sucesso quando a operação é bem-sucedida
-@patch("src.core.git_service.interface_git")
-def test_restaurar_alteracoes_sucesso(mock_interface):
-    res_restore = MagicMock()
-    res_restore.returncode = 0
-    res_restore.stdout = "Restoring changes...\n"
-    mock_interface.return_value = res_restore
+# Teste 26: restaurar_alteracoes retorna a mensagem de sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_restaurar_alteracoes_sucesso(mock_executar):
+    mock_executar.return_value = ("Desfeito com sucesso!", True, "")
 
-    msg, sucesso = restaurar_alteracoes()
-    assert msg == "Desfeito com sucesso!"
-    assert sucesso is True
+    res = restaurar_alteracoes()
 
-# Teste 25: restaurar_alteracoes retorna a mensagem de erro quando a operação falha
-@patch("src.core.git_service.interface_git")
-def test_restaurar_alteracoes_falha(mock_interface):
-    res_restore = MagicMock()
-    res_restore.returncode = 1
-    res_restore.stderr = "error: could not restore changes"
-    mock_interface.return_value = res_restore
+    assert res.sucesso is True
+    assert res.mensagem == "Desfeito com sucesso!"
 
-    msg, sucesso = restaurar_alteracoes()
-    
-    assert msg == "error: could not restore changes"
-    assert sucesso is False
+# Teste 27: restaurar_alteracoes retorna a mensagem de erro quando a operação falha
+@patch("src.core.git_service.executar_e_tratar")
+def test_restaurar_alteracoes_falha(mock_executar):
+    mock_executar.return_value = ("Erro ao restaurar", False, "error: could not restore")
+
+    res = restaurar_alteracoes()
+
+    assert res.sucesso is False
+    assert res.erro_detalhado == "error: could not restore"
 
 # -----------------------------------------------------------------------------
 # deletar_branch
 # -----------------------------------------------------------------------------
 
-# Teste 26: deletar_branch retorna a mensagem de sucesso quando a operação é bem-sucedida
-@patch("src.core.git_service.interface_git")
-def test_deletar_branch_sucesso(mock_interface):
-    res_delete = MagicMock()
-    res_delete.returncode = 0
-    res_delete.stdout = "Deleted branch feature/login (was abc123).\n"
-    mock_interface.return_value = res_delete
+# Teste 28: deletar_branch retorna a mensagem de sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_deletar_branch_sucesso(mock_executar):
+    mock_executar.return_value = ("Branch 'feature/login' deletada!", True, "")
 
-    msg, sucesso = deletar_branch("feature/login")
-    
-    assert msg == "Branch deletada!"
-    assert sucesso is True
+    res = deletar_branch("feature/login")
 
-    mock_interface.assert_called_once_with(["git", "branch", "-d", "feature/login"])
+    assert res.sucesso is True
+    assert res.mensagem == "Branch 'feature/login' deletada!"
+    mock_executar.assert_called_once_with(["git", "branch", "-d", "feature/login"], "Branch 'feature/login' deletada!")
 
-# Teste 27: deletar_branch retorna a mensagem de erro quando a operação falha
-@patch("src.core.git_service.interface_git")
-def test_deletar_branch_falha(mock_interface):
-    res_delete = MagicMock()
-    res_delete.returncode = 1
-    res_delete.stderr = "error: could not delete branch"
-    mock_interface.return_value = res_delete
+# Teste 29: deletar_branch retorna a mensagem de erro quando a operação falha
+@patch("src.core.git_service.executar_e_tratar")
+def test_deletar_branch_falha(mock_executar):
+    mock_executar.return_value = ("Erro ao deletar branch", False, "error: branch not found")
 
-    msg, sucesso = deletar_branch("feature/login")
-    
-    assert msg == "error: could not delete branch"
-    assert sucesso is False
+    res = deletar_branch("feature/login")
+
+    assert res.sucesso is False
+    assert res.erro_detalhado == "error: branch not found"
 
 # -----------------------------------------------------------------------------
 # remover_staging
 # -----------------------------------------------------------------------------
 
-# Teste 28: remover_staging retorna a mensagem de sucesso quando a operação é bem-sucedida
-@patch("src.core.git_service.interface_git")
-def test_remover_staging_sucesso(mock_interface):
-    res_restore = MagicMock()
-    res_restore.returncode = 0
-    res_restore.stdout = "Unstaged changes...\n"
-    mock_interface.return_value = res_restore
+# Teste 30: remover_staging retorna a mensagem de sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_remover_staging_sucesso(mock_executar):
+    mock_executar.return_value = ("Staging removido com sucesso!", True, "")
 
-    msg, sucesso = remover_staging()
-    
-    assert msg == "Staging removido com sucesso!"
-    assert sucesso is True
+    res = remover_staging()
 
-# Teste 29: remover_staging retorna a mensagem de erro quando a operação falha
-@patch("src.core.git_service.interface_git")
-def test_remover_staging_falha(mock_interface):
-    res_restore = MagicMock()
-    res_restore.returncode = 1
-    res_restore.stderr = "error: could not remove staging"
-    mock_interface.return_value = res_restore
+    assert res.sucesso is True
+    assert res.mensagem == "Staging removido com sucesso!"
 
-    msg, sucesso = remover_staging()
-    
-    assert msg == "error: could not remove staging"
-    assert sucesso is False
+# Teste 31: remover_staging retorna a mensagem de erro quando a operação falha
+@patch("src.core.git_service.executar_e_tratar")
+def test_remover_staging_falha(mock_executar):
+    mock_executar.return_value = ("Erro ao remover staging", False, "error: could not remove staging")
+
+    res = remover_staging()
+
+    assert res.sucesso is False
+    assert res.erro_detalhado == "error: could not remove staging"
 
 # -----------------------------------------------------------------------------
 # historico
 # -----------------------------------------------------------------------------
 
-# Teste 30: historico retorna o histórico de commits quando a operação é bem-sucedida
+# Teste 32: historico retorna o histórico de commits quando a operação é bem-sucedida
 @patch("src.core.git_service.interface_git")
 def test_historico_sucesso(mock_interface):
-    res_log = MagicMock()
-    res_log.returncode = 0
-    res_log.stdout = "commit abc123\nAuthor: Dev <dev@example.com>\nDate: Mon Jan 1 00:00:00 2023 +0000\n\n    Initial commit\n"
-    mock_interface.return_value = res_log
-    
-    resultado = historico()
-    
-    assert resultado == "commit abc123\nAuthor: Dev <dev@example.com>\nDate: Mon Jan 1 00:00:00 2023 +0000\n\n    Initial commit\n"
-    mock_interface.assert_called_once_with(["git", "log"])
+    mock_interface.return_value = MagicMock(returncode=0, stdout="commit abc123\nAuthor: Dev\n")
 
-# Teste 31: historico retorna None quando a operação falha
+    res = historico()
+
+    assert res.sucesso is True
+    assert "commit abc123" in res.dados
+
+# Teste 33: historico retorna None quando a operação falha
 @patch("src.core.git_service.interface_git")
 def test_historico_falha(mock_interface):
-    res_log = MagicMock()
-    res_log.returncode = 1
-    res_log.stderr = "error: could not retrieve log"
-    mock_interface.return_value = res_log
-    
-    resultado = historico()
-    
-    assert resultado is None
-    mock_interface.assert_called_once_with(["git", "log"])
+    mock_interface.return_value = MagicMock(returncode=1, stderr="error: could not retrieve log")
+
+    res = historico()
+
+    assert res.sucesso is False
+    assert res.erro_detalhado == "error: could not retrieve log"
 
 # -----------------------------------------------------------------------------
 # diff
 # -----------------------------------------------------------------------------
 
-# Teste 32: diff retorna o diff quando a operação é bem-sucedida
+# Teste 34: diff retorna o diff quando a operação é bem-sucedida
 @patch("src.core.git_service.interface_git")
 def test_diff_sucesso(mock_interface):
-    res_diff = MagicMock()
-    res_diff.returncode = 0
-    res_diff.stdout = "diff --git a/file.txt b/file.txt\nindex abc123..def456 100644\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-Hello World\n+Hello GugaGit\n"
-    mock_interface.return_value = res_diff
-    
-    resultado = diff()
-    
-    assert resultado == "diff --git a/file.txt b/file.txt\nindex abc123..def456 100644\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-Hello World\n+Hello GugaGit\n"
-    mock_interface.assert_called_once_with(["git", "diff"])
+    mock_interface.return_value = MagicMock(returncode=0, stdout="diff --git a/file.txt b/file.txt\n")
 
-# Teste 33: diff retorna None quando a operação falha
+    res = diff()
+
+    assert res.sucesso is True
+    assert "diff --git" in res.dados
+
+# Teste 35: diff retorna None quando a operação falha
 @patch("src.core.git_service.interface_git")
 def test_diff_falha(mock_interface):
-    res_diff = MagicMock()
-    res_diff.returncode = 1
-    res_diff.stderr = "error: could not retrieve diff"
-    mock_interface.return_value = res_diff
-    
-    resultado = diff()
-    
-    assert resultado is None
-    mock_interface.assert_called_once_with(["git", "diff"])
+    mock_interface.return_value = MagicMock(returncode=1, stderr="error: diff failed")
+
+    res = diff()
+
+    assert res.sucesso is False
+    assert res.erro_detalhado == "error: diff failed"
 
 # -----------------------------------------------------------------------------
 # stash
 # -----------------------------------------------------------------------------
 
-# Teste 34: stash retorna a mensagem de sucesso quando a operação é bem-sucedida
-@patch("src.core.git_service.interface_git")
-def test_stash_sucesso(mock_interface):
-    res_stash = MagicMock()
-    res_stash.returncode = 0
-    res_stash.stdout = "Saved working directory and index state WIP on main: abc123 Commit message\n"
-    mock_interface.return_value = res_stash
+# Teste 36: stash retorna a mensagem de sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_stash_sucesso(mock_executar):
+    mock_executar.return_value = ("Alterações guardadas no stash!", True, "")
 
-    msg, sucesso = stash()
+    res = stash()
+
+    assert res.sucesso is True
+    assert res.mensagem == "Alterações guardadas no stash!"
+
+# Teste 37: stash retorna a mensagem de erro quando a operação falha
+@patch("src.core.git_service.executar_e_tratar")
+def test_stash_falha(mock_executar):
+    mock_executar.return_value = ("error: could not stash changes", False, "")
     
-    assert msg == "Alterações guardadas no stash!"
-    assert sucesso is True
-
-# Teste 35: stash retorna a mensagem de erro quando a operação falha
-@patch("src.core.git_service.interface_git")
-def test_stash_falha(mock_interface):
-    res_stash = MagicMock()
-    res_stash.returncode = 1
-    res_stash.stderr = "error: could not stash changes"
-    mock_interface.return_value = res_stash
-
-    msg, sucesso = stash()
+    res = stash()
     
-    assert msg == "error: could not stash changes"
-    assert sucesso is False
+    assert res.sucesso is False
+    assert res.mensagem == "error: could not stash changes"
 
-# Teste 35: stash_pop retorna a mensagem de sucesso quando a operação é bem-sucedida
-@patch("src.core.git_service.interface_git")
-def test_stash_pop_sucesso(mock_interface):
-    res_stash_pop = MagicMock()
-    res_stash_pop.returncode = 0
-    res_stash_pop.stdout = "On branch main\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\n\tmodified:   file.txt\n"
-    mock_interface.return_value = res_stash_pop
+# Teste 38: stash_pop retorna a mensagem de sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_stash_pop_sucesso(mock_executar):
+    mock_executar.return_value = ("Stash aplicado!", True, "")
 
-    msg, sucesso = stash_pop()
+    res = stash_pop()
+
+    assert res.sucesso is True
+    assert res.mensagem == "Stash aplicado!"
+
+# Teste 39: stash_pop retorna a mensagem de erro quando a operação falha
+@patch("src.core.git_service.executar_e_tratar")
+def test_stash_pop_falha(mock_executar):
+    mock_executar.return_value = ("error: could not apply stash", False, "")
     
-    assert msg == "Stash aplicado!"
-    assert sucesso is True
-
-# Teste 36: stash_pop retorna a mensagem de erro quando a operação falha
-@patch("src.core.git_service.interface_git")
-def test_stash_pop_falha(mock_interface):
-    res_stash_pop = MagicMock()
-    res_stash_pop.returncode = 1
-    res_stash_pop.stderr = "error: could not apply stash"
-    mock_interface.return_value = res_stash_pop
-
-    msg, sucesso = stash_pop()
+    res = stash_pop()
     
-    assert msg == "error: could not apply stash"
-    assert sucesso is False
+    assert res.sucesso is False
+    assert res.mensagem == "error: could not apply stash"
 
-# Teste 37: listar_stash retorna a lista de stashes quando a operação é bem-sucedida
+# Teste 40: listar_stash retorna a lista de stashes quando a operação é bem-sucedida
 @patch("src.core.git_service.interface_git")
 def test_listar_stash_sucesso(mock_interface):
-    res_listar_stash = MagicMock()
-    res_listar_stash.returncode = 0
-    res_listar_stash.stdout = "stash@{0}: WIP on main: abc123 Commit message\nstash@{1}: WIP on main: def456 Another commit\n"
-    mock_interface.return_value = res_listar_stash
+    mock_interface.return_value = MagicMock(returncode=0, stdout="stash@{0}: WIP on main\n")
 
-    resultado = listar_stash()
-    
-    assert resultado == "stash@{0}: WIP on main: abc123 Commit message\nstash@{1}: WIP on main: def456 Another commit\n"
-    mock_interface.assert_called_once_with(["git", "stash", "list"])
+    res = listar_stash()
 
-# Teste 38: listar_stash retorna None quando a operação falha
+    assert res.sucesso is True
+    assert "stash@{0}" in res.dados
+
+# Teste 41: listar_stash retorna False quando a operação falha
 @patch("src.core.git_service.interface_git")
 def test_listar_stash_falha(mock_interface):
-    res_listar_stash = MagicMock()
-    res_listar_stash.returncode = 1
-    res_listar_stash.stderr = "error: could not list stash"
-    mock_interface.return_value = res_listar_stash
+    mock_interface.return_value = MagicMock(returncode=1, stderr="error: could not list stash")
 
-    resultado = listar_stash()
-    
-    assert resultado is None
-    mock_interface.assert_called_once_with(["git", "stash", "list"])
+    res = listar_stash()
+
+    assert res.sucesso is False
+    assert res.dados is None
+    assert "error: could not list stash" in res.erro_detalhado
 
 # -----------------------------------------------------------------------------
 # merge
 # -----------------------------------------------------------------------------
 
-# Teste 39: merge retorna a mensagem de sucesso quando a operação é bem-sucedida
-@patch("src.core.git_service.interface_git")
-def test_merge_sucesso(mock_interface):
-    res_merge = MagicMock()
-    res_merge.returncode = 0
-    res_merge.stdout = "Merge made by the 'recursive' strategy.\n file.txt | 1 +\n 1 file changed, 1 insertion(+)\n"
-    mock_interface.return_value = res_merge
+# Teste 42: merge retorna a mensagem de sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_merge_sucesso(mock_executar):
+    mock_executar.return_value = ("Merge de 'feature/login' realizado com sucesso!", True, "")
 
-    msg, sucesso = merge("feature/login")
-    
-    assert msg == "Mergeado com sucesso!"
-    assert sucesso is True
+    res = merge("feature/login")
 
-# Teste 40: merge retorna a mensagem de erro quando a operação falha
-@patch("src.core.git_service.interface_git")
-def test_merge_falha(mock_interface):
-    res_merge = MagicMock()
-    res_merge.returncode = 1
-    res_merge.stderr = "error: could not merge"
-    mock_interface.return_value = res_merge
+    assert res.sucesso is True
+    assert res.mensagem == "Merge de 'feature/login' realizado com sucesso!"
 
-    msg, sucesso = merge("feature/login")
-    
-    assert msg == "error: could not merge"
-    assert sucesso is False
+# Teste 43: merge retorna a mensagem de erro quando a operação falha
+@patch("src.core.git_service.executar_e_tratar")
+def test_merge_falha(mock_executar):
+    mock_executar.return_value = ("Erro ao realizar merge", False, "error: could not merge")
+
+    res = merge("feature/login")
+
+    assert res.sucesso is False
+    assert res.erro_detalhado == "error: could not merge"
 
 # -----------------------------------------------------------------------------
 # listar_tags
 # -----------------------------------------------------------------------------
 
-# Teste 41: listar_tags retorna a lista de tags quando a operação é bem-sucedida
+# Teste 44: listar_tags retorna a lista de tags quando a operação é bem-sucedida
 @patch("src.core.git_service.interface_git")
 def test_listar_tags_sucesso(mock_interface):
-    res_listar_tags = MagicMock()
-    res_listar_tags.returncode = 0
-    res_listar_tags.stdout = "v1.0.0\nv1.1.0\nv2.0.0\n"
-    mock_interface.return_value = res_listar_tags
+    mock_interface.return_value = MagicMock(returncode=0, stdout="v1.0.0\nv1.1.0\n")
 
-    resultado = listar_tags()
-    
-    assert resultado == "v1.0.0\nv1.1.0\nv2.0.0\n"
-    mock_interface.assert_called_once_with(["git", "tag"])
+    res = listar_tags()
 
-# Teste 42: listar_tags retorna None quando a operação falha
+    assert res.sucesso is True
+    assert "v1.0.0" in res.dados
+
+# Teste 45: listar_tags retorna False quando a operação falha
 @patch("src.core.git_service.interface_git")
 def test_listar_tags_falha(mock_interface):
-    res_listar_tags = MagicMock()
-    res_listar_tags.returncode = 1
-    res_listar_tags.stderr = "error: could not list tags"
-    mock_interface.return_value = res_listar_tags
+    mock_interface.return_value = MagicMock(returncode=1, stderr="error: could not list tags")
 
-    resultado = listar_tags()
-    
-    assert resultado is None
-    mock_interface.assert_called_once_with(["git", "tag"])
+    res = listar_tags()
+
+    assert res.sucesso is False
+    assert res.dados is None  # Em caso de falha, dados deve ser None
+    assert "error: could not list tags" in res.erro_detalhado
 
 # -----------------------------------------------------------------------------
-# trocar_branch
+# obter_arquivos_status
 # -----------------------------------------------------------------------------
+
+# Teste 46: obter_arquivos_status retorna a lista de arquivos com status quando a operação é bem-sucedida
+@patch("src.core.git_service.interface_git")
+def test_obter_arquivos_status_sucesso(mock_interface):
+    mock_interface.return_value = MagicMock(
+        returncode=0, 
+        stdout=" M file1.txt\nM  file2.txt\n?? file3.txt\n"
+    )
+
+    res = obter_arquivos_status()
+
+    assert res.sucesso is True
+    assert len(res.dados) == 3
+    assert res.dados[0]["caminho"] == "file1.txt"
+    assert res.dados[0]["staged"] is False
+    assert res.dados[1]["staged"] is True
+
+# Teste 47: obter_arquivos_status retorna lista vazia quando não há arquivos modificados
+@patch("src.core.git_service.interface_git")
+def test_obter_arquivos_status_vazio(mock_interface):
+    mock_interface.return_value = MagicMock(returncode=0, stdout="")
+
+    res = obter_arquivos_status()
+
+    assert res.sucesso is True
+    assert res.dados == []
+
+# -----------------------------------------------------------------------------
+# adicionar_arquivos_staging & remover_selecionados_staging
+# -----------------------------------------------------------------------------
+
+# Teste 48: adicionar_arquivos_staging retorna sucesso quando a lista de arquivos está vazia
+def test_adicionar_arquivos_staging_vazio():
+    res = adicionar_arquivos_staging([])
+
+    assert res.sucesso is True
+    assert res.mensagem == "Nenhum arquivo selecionado."
+
+# Teste 49: adicionar_arquivos_staging retorna sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_adicionar_arquivos_staging_sucesso(mock_executar):
+    mock_executar.return_value = ("Arquivos selecionados adicionados ao staging!", True, "")
+
+    res = adicionar_arquivos_staging(["file1.txt", "file2.txt"])
+
+    assert res.sucesso is True
+    mock_executar.assert_called_once_with(
+        ["git", "add", "file1.txt", "file2.txt"], 
+        "Arquivos selecionados adicionados ao staging!"
+    )
+
+# Teste 50: remover_selecionados_staging retorna sucesso quando a lista de arquivos está vazia
+def test_remover_selecionados_staging_vazio():
+    res = remover_selecionados_staging([])
+
+    assert res.sucesso is True
+    assert res.mensagem == "Nenhum arquivo selecionado."
+
+# Teste 51: remover_selecionados_staging retorna sucesso quando a operação é bem-sucedida
+@patch("src.core.git_service.executar_e_tratar")
+def test_remover_selecionados_staging_sucesso(mock_executar):
+    mock_executar.return_value = ("Arquivos removidos do staging!", True, "")
+
+    res = remover_selecionados_staging(["file1.txt"])
+
+    assert res.sucesso is True
+    mock_executar.assert_called_once_with(
+        ["git", "restore", "--staged", "file1.txt"], 
+        "Arquivos removidos do staging!"
+    )

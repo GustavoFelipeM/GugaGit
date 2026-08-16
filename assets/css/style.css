@@ -462,7 +462,7 @@ input:checked + .toggle-slider:before { transform: translateX(20px); }
 }
 
 .branch-control-card {
-    min-height: 241px;
+    min-height: 237px;
 }
 
 .local-changes-card {

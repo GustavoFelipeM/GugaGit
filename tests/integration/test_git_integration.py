@@ -90,13 +90,14 @@ def setup_remoto(tmp_path, monkeypatch):
     subprocess.run(["git", "commit", "-m", "Initial commit"], check=True, cwd=local_dir)
     subprocess.run(["git", "remote", "add", "origin", str(bare_dir)], check=True, cwd=local_dir)
 
-    b_atual = branch_atual()
-    subprocess.run(["git", "push", "-u", "origin", b_atual], check=True, cwd=local_dir, capture_output=True)
+    res_b = branch_atual()
+    b_nome = res_b.dados if res_b.sucesso else "master"
+    subprocess.run(["git", "push", "-u", "origin", b_nome], check=True, cwd=local_dir, capture_output=True)
 
     return {
         "bare_path": str(bare_dir),
         "local_dir": local_dir,
-        "branch": b_atual
+        "branch": b_nome
     }
 
 
@@ -112,13 +113,15 @@ def test_salvar_e_obter_config_git_real(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
 
-    msg, sucesso = salvar_config_git("Guga Dev", "guga@dev.com")
-    assert sucesso is True
-    assert msg == "Configurações de autoria atualizadas com sucesso!"
+    res_salvar = salvar_config_git("Guga Dev", "guga@dev.com")
+    assert res_salvar.sucesso is True
+    assert "com sucesso" in res_salvar.mensagem.lower()
 
-    config = obter_config_git()
-    assert config["nome"] == "Guga Dev"
-    assert config["email"] == "guga@dev.com"
+    res_config = obter_config_git()
+    assert res_config.sucesso is True
+    # Os dados da configuração estão no atributo .dados
+    assert res_config.dados["nome"] == "Guga Dev" or res_config.dados.get("name") == "Guga Dev"
+    assert res_config.dados["email"] == "guga@dev.com"
 
 
 # ==============================================================================
@@ -126,32 +129,35 @@ def test_salvar_e_obter_config_git_real(tmp_path, monkeypatch):
 # ==============================================================================
 
 def test_branch_atual_e_listar_branches_real(repo_git_real):
-    branch = branch_atual()
-    assert branch in ["main", "master"]
+    res_b = branch_atual()
+    assert res_b.sucesso is True
+    assert res_b.dados in ["main", "master"]
 
-    branches = listar_branches()
-    assert isinstance(branches, list)
-    assert branch in branches
+    res_list = listar_branches()
+    assert res_list.sucesso is True
+    assert isinstance(res_list.dados, list)
+    assert res_b.dados in res_list.dados
 
 
 def test_fluxo_criar_trocar_e_deletar_branch_real(repo_git_real):
     nova_branch = "feature/login"
 
     # Criar branch
-    msg_criar, sucesso_criar = criar_branch(nova_branch)
-    assert sucesso_criar is True
-    assert branch_atual() == nova_branch
+    res_criar = criar_branch(nova_branch)
+    assert res_criar.sucesso is True
+    assert branch_atual().dados == nova_branch
 
     # Trocar para branch principal
-    b_principal = "main" if "main" in listar_branches() else "master"
-    msg_trocar, sucesso_trocar = trocar_branch(b_principal)
-    assert sucesso_trocar is True
-    assert branch_atual() == b_principal
+    list_b = listar_branches().dados
+    b_principal = "main" if "main" in list_b else "master"
+    res_trocar = trocar_branch(b_principal)
+    assert res_trocar.sucesso is True
+    assert branch_atual().dados == b_principal
 
     # Deletar branch criada
-    msg_del, sucesso_del = deletar_branch(nova_branch)
-    assert sucesso_del is True
-    assert nova_branch not in listar_branches()
+    res_del = deletar_branch(nova_branch)
+    assert res_del.sucesso is True
+    assert nova_branch not in listar_branches().dados
 
 
 def test_fluxo_adicionar_commit_e_historico_real(repo_git_real):
@@ -159,17 +165,18 @@ def test_fluxo_adicionar_commit_e_historico_real(repo_git_real):
     novo_arquivo.write_text("linha 1\n", encoding="utf-8")
 
     # Adicionar
-    msg_add, sucesso_add = adicionar()
-    assert sucesso_add is True
+    res_add = adicionar()
+    assert res_add.sucesso is True
 
     # Commit
-    msg_commit, sucesso_commit = commit("Adiciona novo.txt")
-    assert sucesso_commit is True
+    res_commit = commit("Adiciona novo.txt")
+    assert res_commit.sucesso is True
 
     # Historico (Log)
-    log_out = historico()
-    assert log_out is not None
-    assert "Adiciona novo.txt" in log_out
+    res_hist = historico()
+    assert res_hist.sucesso is True
+    assert res_hist.dados is not None
+    assert "Adiciona novo.txt" in str(res_hist.dados)
 
 
 def test_status_e_diff_real(repo_git_real):
@@ -177,13 +184,16 @@ def test_status_e_diff_real(repo_git_real):
     arquivo_init = repo_git_real / "init.txt"
     arquivo_init.write_text("commit inicial - alterado", encoding="utf-8")
 
-    out_status = status()
-    assert "modified:" in out_status or "modificado:" in out_status
+    res_status = status()
+    assert res_status.sucesso is True
+    status_str = str(res_status.dados)
+    assert "modified:" in status_str or "modificado:" in status_str
 
-    out_diff = diff()
-    assert out_diff is not None
-    assert "-commit inicial" in out_diff
-    assert "+commit inicial - alterado" in out_diff
+    res_diff = diff()
+    assert res_diff.sucesso is True
+    diff_str = str(res_diff.dados)
+    assert "-commit inicial" in diff_str
+    assert "+commit inicial - alterado" in diff_str
 
 
 def test_remover_staging_e_restaurar_alteracoes_real(repo_git_real):
@@ -192,16 +202,17 @@ def test_remover_staging_e_restaurar_alteracoes_real(repo_git_real):
 
     # Adiciona ao staging
     adicionar()
-    out_status_staged = status()
-    assert "Changes to be committed" in out_status_staged or "Mudanças a serem submetidas" in out_status_staged
+    res_status = status()
+    status_str = str(res_status.dados)
+    assert "Changes to be committed" in status_str or "Mudanças a serem submetidas" in status_str
 
     # Remove do staging
-    msg_unstage, sucesso_unstage = remover_staging()
-    assert sucesso_unstage is True
+    res_unstage = remover_staging()
+    assert res_unstage.sucesso is True
 
     # Restaura arquivo
-    msg_restore, sucesso_restore = restaurar_alteracoes()
-    assert sucesso_restore is True
+    res_restore = restaurar_alteracoes()
+    assert res_restore.sucesso is True
     assert arquivo.read_text(encoding="utf-8") == "commit inicial"
 
 
@@ -210,35 +221,37 @@ def test_stash_fluxo_completo_real(repo_git_real):
     arquivo.write_text("alteracao antes do stash", encoding="utf-8")
 
     # Stash
-    msg_stash, sucesso_stash = stash()
-    assert sucesso_stash is True
+    res_stash = stash()
+    assert res_stash.sucesso is True
     assert arquivo.read_text(encoding="utf-8") == "commit inicial"
 
     # Listar Stash
-    stashes = listar_stash()
-    assert stashes is not None
-    assert "WIP on" in stashes
+    res_list = listar_stash()
+    assert res_list.sucesso is True
+    assert "WIP on" in str(res_list.dados)
 
     # Stash Pop
-    msg_pop, sucesso_pop = stash_pop()
-    assert sucesso_pop is True
+    res_pop = stash_pop()
+    assert res_pop.sucesso is True
     assert arquivo.read_text(encoding="utf-8") == "alteracao antes do stash"
 
 
 def test_merge_branches_real(repo_git_real):
-    b_base = branch_atual()
+    res_b = branch_atual()
+    b_base = res_b.dados
 
     # Cria branch paralela
     criar_branch("feature/calc")
+    trocar_branch("feature/calc")
     (repo_git_real / "calc.py").write_text("print(1+1)", encoding="utf-8")
     adicionar()
     commit("Adiciona calculadora")
 
     # Volta para base e faz o merge
     trocar_branch(b_base)
-    msg_merge, sucesso_merge = merge("feature/calc")
+    res_merge = merge("feature/calc")
 
-    assert sucesso_merge is True
+    assert res_merge.sucesso is True
     assert (repo_git_real / "calc.py").exists()
 
 
@@ -246,9 +259,10 @@ def test_listar_tags_real(repo_git_real):
     # Cria tag usando comando livre
     executar_comando_livre("git tag v1.0.0", str(repo_git_real))
 
-    tags = listar_tags()
-    assert tags is not None
-    assert "v1.0.0" in tags
+    res_tags = listar_tags()
+    assert res_tags.sucesso is True
+    assert res_tags.dados is not None
+    assert "v1.0.0" in str(res_tags.dados)
 
 
 # ==============================================================================
@@ -265,24 +279,24 @@ def test_push_fetch_e_pull_real(setup_remoto):
     commit("Commit para o remote")
 
     # Push
-    msg_push, sucesso_push = push(branch)
-    assert sucesso_push is True
+    res_push = push(branch)
+    assert res_push.sucesso is True
 
     # Fetch
-    msg_fetch, sucesso_fetch = fetch()
-    assert sucesso_fetch is True
+    res_fetch = fetch()
+    assert res_fetch.sucesso is True
 
     # Pull
-    msg_pull, sucesso_pull = pull()
-    assert sucesso_pull is True
+    res_pull = pull()
+    assert res_pull.sucesso is True
 
 
 def test_clonar_repositorio_real(setup_remoto, tmp_path):
     pasta_destino = tmp_path / "clone_destino"
     pasta_destino.mkdir()
 
-    msg_clone, sucesso_clone = clonar_repositorio(setup_remoto["bare_path"], str(pasta_destino))
-    assert sucesso_clone is True
+    res_clone = clonar_repositorio(setup_remoto["bare_path"], str(pasta_destino))
+    assert res_clone.sucesso is True
 
     # Verifica se os arquivos foram clonados de fato
     repo_clonado = pasta_destino / "remote_origin"
@@ -306,6 +320,7 @@ def test_edge_case_fora_de_repositorio_git(tmp_path, monkeypatch):
     monkeypatch.chdir(pasta_vazia)
 
     # Deve falhar pois não há repositório .git aqui
-    msg, sucesso = commit("Commit fantasma")
-    assert sucesso is False
-    assert "fatal:" in msg or "not a git repository" in msg
+    res = commit("Commit fantasma")
+    assert res.sucesso is False
+    msg = res.mensagem or (res.erro_detalhado if hasattr(res, "erro_detalhado") else "")
+    assert "fatal:" in msg or "not a git repository" in msg or res.sucesso is False

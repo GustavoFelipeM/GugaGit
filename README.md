@@ -74,7 +74,7 @@ GugaGit/
 ├── .gitignore
 ├── main.py
 ├── README.md
-└── requirements.txtss
+└── requirements.txt
 ```
 
 ## 🔧 Requisitos de Sistema

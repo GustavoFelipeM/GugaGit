@@ -1,4 +1,4 @@
-# Pastas temporárias e cache do Python (ESSAS SIM DEVEM SER IGNORADAS)
+# Pastas temporárias e cache do Python
 __pycache__/
 *.pyc
 *.pyo
@@ -12,6 +12,10 @@ env/
 
 # Configurações de IDEs
 .vscode/
+
+# Arquivos de teste
+.coverage
+htmlcov/
 
 # Pastas de build executável (PyInstaller / PyWebView)
 build/
