@@ -29,5 +29,7 @@ jobs:
         pip install pytest pytest-cov
 
     - name: Run Tests with Coverage
+      env:
+            PYTHONPATH: .
       run: |
         pytest --cov=src --cov-report=term-missing tests/
