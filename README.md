@@ -74,7 +74,7 @@ GugaGit/
 ├── .gitignore
 ├── main.py
 ├── README.md
-└── requirements.txtss
+└── requirements.txt
 ```
 
 ## 🔧 Requisitos de Sistema
@@ -218,7 +218,7 @@ pytest tests/test_git_integration.py tests/test_storage_integration.py -v
 ## 📸 Demonstração da Interface
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/8a946def-7ddb-43d2-a81e-361a699929db" alt="Interface do GugaGit Pro" width="100%" />
+  <img src="https://github.com/user-attachments/assets/c86aa188-c306-48ef-82f7-45f597553b5f" alt="Interface do GugaGit Pro" width="100%" />
 </div>
 <br>
 
