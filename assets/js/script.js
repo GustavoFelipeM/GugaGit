@@ -478,6 +478,183 @@ function inicializarBackend() {
     carregarArquivosModificados();
 }
 
+/* ==========================================================================
+   7. MODAL DE DIFF E INSPEÇÃO DE ALTERAÇÕES
+   ========================================================================== */
+async function executarDiff() {
+    await abrirModalDiff();
+}
+
+async function abrirModalDiff() {
+    const modal = document.getElementById('modal-diff');
+    if (modal) modal.style.display = 'flex';
+    await carregarDiffResumo();
+}
+
+function fecharModalDiff() {
+    const modal = document.getElementById('modal-diff');
+    if (modal) modal.style.display = 'none';
+}
+
+function formatarDiffColorido(texto) {
+    if (!texto || !texto.trim()) {
+        return '<span style="color:#a1a1aa;">Nenhuma diferença encontrada para o item selecionado.</span>';
+    }
+
+    const linhas = texto.split('\n');
+    return linhas.map(linha => {
+        const esc = linha
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+
+        if (linha.startsWith('+') && !linha.startsWith('+++')) {
+            return `<div style="background: rgba(34, 197, 94, 0.15); color: #4ade80; padding: 0 4px; border-left: 3px solid #22c55e;">${esc}</div>`;
+        } else if (linha.startsWith('-') && !linha.startsWith('---')) {
+            return `<div style="background: rgba(239, 68, 68, 0.15); color: #f87171; padding: 0 4px; border-left: 3px solid #ef4444;">${esc}</div>`;
+        } else if (linha.startsWith('@@')) {
+            return `<div style="color: #60a5fa; font-weight: bold; background: rgba(96, 165, 250, 0.1); padding: 2px 4px; margin: 4px 0;">${esc}</div>`;
+        } else if (linha.startsWith('diff --git') || linha.startsWith('index ')) {
+            return `<div style="color: #a1a1aa; font-weight: bold;">${esc}</div>`;
+        }
+        return `<div style="color: #d4d4d8;">${esc}</div>`;
+    }).join('');
+}
+
+async function carregarDiffResumo() {
+    const container = document.getElementById('diff-lista-container');
+    const contentArea = document.getElementById('diff-content-area');
+    if (!container) return;
+
+    container.innerHTML = '<span style="color: var(--text-secondary); font-size: 11px;">Carregando alterações...</span>';
+
+    try {
+        const res = await pywebview.api.obter_resumo_alteracoes();
+        const dados = res.dados || { working_tree: [], staged: [], total: 0 };
+
+        container.innerHTML = '';
+
+        if (dados.total === 0) {
+            container.innerHTML = `
+                <div style="padding: 12px; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 8px; font-size: 12px; color: #4ade80;">
+                    🟢 Nenhuma alteração pendente no repositório. O Working Tree está limpo.
+                </div>
+            `;
+            if (contentArea) {
+                contentArea.innerHTML = '<span style="color:#a1a1aa;">O repositório não possui diferenças pendentes no momento.</span>';
+            }
+            return;
+        }
+
+        const renderGrupo = (titulo, arquivos, ehStaged) => {
+            const grupoDiv = document.createElement('div');
+            grupoDiv.style.cssText = 'display: flex; flex-direction: column; gap: 6px;';
+
+            const header = document.createElement('div');
+            header.style.cssText = 'font-size: 11px; font-weight: bold; color: var(--accent); font-family: "JetBrains Mono", monospace; margin-top: 4px;';
+            header.textContent = `${titulo} (${arquivos.length})`;
+            grupoDiv.appendChild(header);
+
+            if (arquivos.length === 0) {
+                const vazio = document.createElement('div');
+                vazio.style.cssText = 'font-size: 11px; color: #71717a; font-style: italic; padding-left: 6px;';
+                vazio.textContent = 'Nenhum arquivo';
+                grupoDiv.appendChild(vazio);
+                return grupoDiv;
+            }
+
+            arquivos.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'diff-item';
+                itemDiv.dataset.caminho = item.caminho;
+                itemDiv.dataset.staged = ehStaged;
+
+                itemDiv.onclick = () => {
+                    document.querySelectorAll('.diff-item').forEach(el => el.classList.remove('active'));
+                    itemDiv.classList.add('active');
+                    carregarDiffArquivo(item.caminho, ehStaged);
+                };
+
+                // Nome do arquivo
+                const name = document.createElement('span');
+                name.textContent = item.caminho;
+                name.style.cssText = 'font-size: 11px; font-family: "JetBrains Mono", monospace; color: #ededed; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;';
+
+                const right = document.createElement('div');
+                right.style.cssText = 'display: flex; align-items: center; gap: 6px; flex-shrink: 0;';
+
+                // Badge de quantidade de alterações
+                const badge = document.createElement('span');
+                badge.textContent = `${item.alteracoes} alt.`;
+                badge.style.cssText = 'font-size: 10px; color: #a1a1aa; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px;';
+
+                // Badge de Status (M, U, D, A, R)
+                const statusLetra = (item.status || item.tipo || 'M').toUpperCase();
+                const badgeStatus = document.createElement('span');
+                badgeStatus.className = `status-badge status-${statusLetra}`;
+                badgeStatus.textContent = statusLetra;
+
+                right.appendChild(badge);
+                right.appendChild(badgeStatus);
+
+                itemDiv.appendChild(name);
+                itemDiv.appendChild(right);
+                grupoDiv.appendChild(itemDiv);
+            });
+
+            return grupoDiv;
+        };
+
+        container.appendChild(renderGrupo('Working Tree (git diff)', dados.working_tree, false));
+        container.appendChild(renderGrupo('Staged (git diff --staged)', dados.staged, true));
+
+        const primeiroItem = container.querySelector('.diff-item');
+        if (primeiroItem) {
+            primeiroItem.classList.add('active');
+            const caminho = primeiroItem.dataset.caminho;
+            const ehStaged = primeiroItem.dataset.staged === 'true';
+            carregarDiffArquivo(caminho, ehStaged);
+        } else {
+            carregarDiffGeral();
+        }
+
+    } catch (e) {
+        console.error("Erro ao carregar resumo de diff:", e);
+        container.innerHTML = `<span style="color: #f87171; font-size: 11px;">⚠️ Erro ao carregar diff: ${e.message || e}</span>`;
+    }
+}
+
+async function carregarDiffArquivo(caminho, staged) {
+    const titulo = document.getElementById('diff-titulo-arquivo');
+    const contentArea = document.getElementById('diff-content-area');
+
+    if (titulo) {
+        titulo.textContent = `${staged ? '[Staged]' : '[Working Tree]'} ${caminho}`;
+    }
+
+    if (contentArea) {
+        contentArea.innerHTML = '<span style="color:#a1a1aa;">Carregando diff...</span>';
+        const diffTexto = await pywebview.api.executar_diff(caminho, staged);
+        contentArea.innerHTML = formatarDiffColorido(diffTexto);
+    }
+}
+
+async function carregarDiffGeral() {
+    const titulo = document.getElementById('diff-titulo-arquivo');
+    const contentArea = document.getElementById('diff-content-area');
+
+    if (titulo) {
+        titulo.textContent = 'Diff Geral (Working Tree)';
+    }
+
+    if (contentArea) {
+        contentArea.innerHTML = '<span style="color:#a1a1aa;">Carregando diff geral...</span>';
+        const diffTexto = await pywebview.api.executar_diff(null, false);
+        contentArea.innerHTML = formatarDiffColorido(diffTexto);
+    }
+}
+
+
 document.addEventListener('DOMContentLoaded', () => {
     const configTerm = localStorage.getItem('gugagit-term-clear');
     if (configTerm !== null) {
