@@ -229,6 +229,56 @@
         </div>
     </div>
 
+    <!-- Modal de Inspeção do Diff -->
+    <div id="modal-diff" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); backdrop-filter: blur(10px); align-items:center; justify-content:center; z-index:9998; padding:24px;">
+        <div style="width:min(1600px, 100%); height:calc(100vh - 48px); background:#121212; border:1px solid var(--border-color); border-radius:18px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 24px 80px rgba(0,0,0,0.8);">
+            
+            <!-- Header do Modal -->
+            <div style="padding:14px 24px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:18px;">🔍</span>
+                    <span style="font-weight:700; font-size:15px; color:#ededed;">Visualizador de Diff & Alterações</span>
+                </div>
+                
+                <!-- Botão de Fechar Moderno -->
+                <button class="modal-close-btn" title="Fechar (Esc)" onclick="fecharModalDiff()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Conteúdo Split (Arquivos x Diff) -->
+            <div style="display:grid; grid-template-columns:340px 1fr; flex:1; min-height:0;">
+                
+                <!-- Lista de Alterações -->
+                <div style="border-right:1px solid var(--border-color); padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:16px; background:rgba(0,0,0,0.2);" class="muted-scrollbar">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:700; font-size:11px; letter-spacing:1px; color:var(--text-secondary);">ALTERAÇÕES</span>
+                        <button class="btn" style="width:auto; padding:3px 10px; font-size:11px;" onclick="carregarDiffResumo()">🔄 Atualizar</button>
+                    </div>
+
+                    <div id="diff-lista-container" style="display:flex; flex-direction:column; gap:14px;">
+                        <!-- Gerado via JS -->
+                    </div>
+                </div>
+
+                <!-- Painel do Código Diff -->
+                <div style="display:flex; flex-direction:column; background:#080808; overflow:hidden;">
+                    <div id="diff-viewer-header" style="padding:12px 20px; border-bottom:1px solid var(--border-color); font-size:13px; font-family:'JetBrains Mono', monospace; color:#a1a1aa; background:rgba(255,255,255,0.02); display:flex; justify-content:space-between; align-items:center;">
+                        <span id="diff-titulo-arquivo">Selecione um arquivo ou veja o diff geral</span>
+                        <button class="btn" style="width:auto; padding:4px 12px; font-size:11px;" onclick="carregarDiffGeral()">Ver Diff Geral</button>
+                    </div>
+                    
+                    <div id="diff-content-area" style="flex:1; overflow:auto; padding:20px; font-family:'JetBrains Mono', monospace; font-size:13px; line-height:1.6; white-space:pre-wrap; word-break:break-all; color:#e4e4e7;" class="muted-scrollbar">
+                        <!-- Diff formatado -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
     <script src="./js/script.js"></script>
 </body>
 </html>

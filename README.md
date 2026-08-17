@@ -53,25 +53,39 @@ GugaGit/
 │   └── index.html
 ├── src/
 │   ├── core/
-│   │   ├── __init__.py
-│   │   └── git_service.py
+│   │   ├── git/
+│   │   │   ├── branch.py
+│   │   │   ├── config.py
+│   │   │   ├── history.py
+│   │   │   ├── remote.py
+│   │   │   ├── staging.py
+│   │   │   ├── stash.py
+│   │   │   └── __init__.py
+│   │   ├── exceptions.py
+│   │   ├── types.py
+│   │   └── __init__.py
 │   ├── infrastructure/
-│   │   ├── __init__.py
 │   │   ├── git_cli.py
-│   │   └── storage.py
+│   │   ├── logger.py
+│   │   ├── storage.py
+│   │   ├── window.py
+│   │   └── __init__.py
 │   ├── ui/
-│   │   ├── __init__.py
-│   │   └── api.py
+│   │   ├── api.py
+│   │   ├── settings.py
+│   │   └── __init__.py
 │   └── __init__.py
 ├── tests/
 │   ├── integration/
 │   │   ├── test_git_integration.py
 │   │   └── test_storage_integration.py
 │   └── unit/
+│       ├── test_api.py
 │       ├── test_git_cli.py
 │       ├── test_git_service.py
 │       └── test_storage.py
 ├── .gitignore
+├── ARCHITECTURE.md
 ├── main.py
 ├── README.md
 └── requirements.txt

@@ -468,3 +468,97 @@ input:checked + .toggle-slider:before { transform: translateX(20px); }
 .local-changes-card {
     min-height: 147px;
 }
+
+/* Botão de Fechar do Modal */
+.modal-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #a1a1aa;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.modal-close-btn:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.modal-close-btn:active {
+    transform: scale(0.92);
+}
+
+/* Card de item do Diff */
+.diff-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 7px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    gap: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+/* Hover suave */
+.diff-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Estado ATIVO (Apenas o arquivo visualizado no momento) */
+.diff-item.active {
+    background: rgba(59, 130, 246, 0.18) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+}
+
+/* Badges de Status (M, U, D, A, R) estilo VS Code */
+.status-badge {
+    font-size: 10px;
+    font-weight: 700;
+    font-family: "JetBrains Mono", monospace;
+    padding: 1px 5px;
+    border-radius: 3px;
+    display: inline-block;
+    text-align: center;
+    min-width: 14px;
+    line-height: 1.2;
+}
+
+/* Modificado (Amarelo/Laranja) */
+.status-badge.status-M {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Novo / Untracked / Adicionado (Verde) */
+.status-badge.status-U,
+.status-badge.status-A {
+    color: #4ade80;
+    background: rgba(74, 222, 128, 0.15);
+    border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+/* Deletado (Vermelho) */
+.status-badge.status-D {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.15);
+    border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+/* Renomeado (Azul) */
+.status-badge.status-R {
+    color: #60a5fa;
+    background: rgba(96, 165, 250, 0.15);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+}
